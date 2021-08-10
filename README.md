@@ -11,5 +11,6 @@ The code is divided in the following files:
 ├── m_sim.f90        <-- Simulation module
 ├── m_stream.f90     <-- Stream function and velocity computation
 ├── parameters.txt   <-- Main parameter file
+├── profile.sh       <-- Shell script for profiling using perf
 └── README.md
 ```
