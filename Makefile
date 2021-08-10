@@ -1,17 +1,31 @@
 FC=gfortran
-FFLAGS=-Wall -fdefault-real-8 -O3
-#FFLAGS=-g -Wall -fdefault-real-8 -fbacktrace -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow -O0
-EXE=main.x
+DEBUG?=0
+
+ifeq ($(DEBUG),1)
+	FFLAGS=-Wall -fdefault-real-8 -O0 -g -fbacktrace -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow
+else
+	FFLAGS=-Wall -fdefault-real-8 -O3
+endif
 
 # Object files
 OBJ=m_bc.o m_fdm.o m_stream.o m_mg.o m_sim.o main.o
 
-exe : $(OBJ)
-	@$(FC) $(FFLAGS) $(OBJ) -o $(EXE)
+all: main.x
+
+main.x : $(OBJ)
+	$(FC) $(FFLAGS) $(OBJ) -o main.x
 
 %.o : %.f90
 	@echo "compiling $<"
-	@$(FC) -c $(FFLAGS) -o $@ $<
+	$(FC) -c $(FFLAGS) -o $@ $<
+
+# Dependencies
+# m_bc.o:
+# m_fdm.o:
+# m_stream.o:
+m_mg.o: m_bc.o
+m_sim.o: m_bc.o m_fdm.o m_mg.o m_stream.o
+main.o: m_sim.o
 
 # Rules
 .PHONY: clean
