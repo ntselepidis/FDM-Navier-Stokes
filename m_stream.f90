@@ -15,7 +15,7 @@ contains
     real :: x = 0.0, y = 0.0
     integer :: i = 0, j = 0
 
-    do concurrent (j=1:ny, i=1:nx)
+    do concurrent (i=1:nx, j=1:ny)
       x = xmin + (i-1) * hx
       y = ymin + (j-1) * hy
       S(i, j) = B * sin((pi * x) / xmax) * sin((pi * y) / ymax)

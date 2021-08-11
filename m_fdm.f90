@@ -37,7 +37,7 @@ contains
     nx = size(T, 1)
     ny = size(T, 2)
 
-    do concurrent (j=2:ny-1, i=2:nx-1)
+    do concurrent (i=2:nx-1, j=2:ny-1)
       if (vx(i, j) > 0) then
         advection2dx(i, j) = vx(i, j) * (T(i, j) - T(i-1, j)) / hx
       else
@@ -61,7 +61,7 @@ contains
     nx = size(T, 1)
     ny = size(T, 2)
 
-    do concurrent (j=2:ny-1, i=2:nx-1)
+    do concurrent (i=2:nx-1, j=2:ny-1)
       if (vy(i, j) > 0) then
         advection2dy(i, j) = vy(i, j) * (T(i, j) - T(i, j-1)) / hy
       else
