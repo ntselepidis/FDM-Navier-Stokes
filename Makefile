@@ -1,10 +1,10 @@
-FC=gfortran
+FC=nvfortran
 DEBUG?=0
 
 ifeq ($(DEBUG),1)
 	FFLAGS=-Wall -fdefault-real-8 -O0 -g -fbacktrace -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow
 else
-	FFLAGS=-Wall -fdefault-real-8 -O3
+	FFLAGS=-Wall -r8 -O3 -Minfo=all -stdpar=gpu -gpu=cc70
 endif
 
 # Object files
