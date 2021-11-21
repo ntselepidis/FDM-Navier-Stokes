@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\title{Numerical Methods for Solving Navier-Stokes Equations}
+\author{Nikolas Tselepidis}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Finite Pr Equations}
+
+\paragraph{Conservation of momentum (dimensionless)}
+
+\begin{equation}
+\frac{1}{Pr} \left( \frac{\partial \vec{v}}{\partial t} + \vec{v} \cdot \nabla \vec{v} \right) =
+    - \nabla P + \nabla^2 \vec{v} + Ra T \hat{y}
+\end{equation}
+
+Taking the curl of equation (1), and substituting the vorticity $\vec{\omega} = \nabla \times \vec{v}$, it follows that:
+
+\begin{equation}
+    \frac{1}{Pr} \left( \frac{\partial \omega}{\partial t} + v_x \frac{\partial \omega}{\partial x} + v_y \frac{\partial \omega}{\partial y} \right) =
+     \nabla^2 \omega - Ra \frac{\partial T}{\partial x}
+\end{equation}
+
+In 2D only one component of vorticity is needed, i.e. the one perpedicular to the 2D plane:  $\nabla^2 \psi = \omega_z$.
+
+\paragraph{Conservation of mass (continuity)}
+\begin{equation}
+    \frac{\partial T}{\partial t} + \vec{v} \cdot \nabla T = \kappa \nabla^2 T
+\end{equation}
+
+\paragraph{Conservation of energy}
+\begin{equation}
+    \nabla \cdot \vec{v} = 0
+\end{equation}
+
+
+\section{Solve}
+
+\begin{equation}
+    \nabla^2 \psi = \omega
+\end{equation}
+
+\begin{equation}
+    \left( v_x, v_y \right) = \left( \frac{\partial \psi}{\partial y}, -\frac{\partial \psi}{\partial x} \right)
+\end{equation}
+
+\begin{equation}
+    \frac{\partial T}{\partial t} = -v_x \frac{\partial T}{\partial x} -v_y \frac{\partial T}{\partial y} + \kappa \nabla^2 T
+\end{equation}
+
+\begin{equation}
+    \frac{\partial \omega}{\partial t} = -v_x \frac{\partial \omega}{\partial x} -v_y \frac{\partial \omega}{\partial y} + Pr \nabla^2 \omega - Ra Pr \frac{\partial T}{\partial x}
+\end{equation}
+
+\end{document}
