@@ -183,13 +183,21 @@ contains
         ic  = (i-1)/2+1
         jc  = (j-1)/2+1
         fine(i, j) = coarse(ic, jc)
+        !$acc atomic update
         fine(i+1, j) = fine(i+1, j) + a2 * coarse(ic, jc)
+        !$acc atomic update
         fine(i-1, j) = fine(i-1, j) + a2 * coarse(ic, jc)
+        !$acc atomic update
         fine(i, j+1) = fine(i, j+1) + a2 * coarse(ic, jc)
+        !$acc atomic update
         fine(i, j-1) = fine(i, j-1) + a2 * coarse(ic, jc)
+        !$acc atomic update
         fine(i+1, j+1) = fine(i+1, j+1) + a4 * coarse(ic, jc)
+        !$acc atomic update
         fine(i+1, j-1) = fine(i+1, j-1) + a4 * coarse(ic, jc)
+        !$acc atomic update
         fine(i-1, j+1) = fine(i-1, j+1) + a4 * coarse(ic, jc)
+        !$acc atomic update
         fine(i-1, j-1) = fine(i-1, j-1) + a4 * coarse(ic, jc)
       end if
     end do
