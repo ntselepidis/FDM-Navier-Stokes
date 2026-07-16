@@ -31,17 +31,22 @@ contains
     real, intent(out) :: vx(:, :)
     real, intent(out) :: vy(:, :)
     ! local variables
+    integer :: i, j
     integer :: nx, ny
     nx = size(S, 1)
     ny = size(S, 2)
 
     ! Initialize vx and vy
-    vx = 0.0
-    vy = 0.0
+    do concurrent (i=1:nx, j=1:ny)
+      vx(i, j) = 0.0
+      vy(i, j) = 0.0
+    end do
 
     ! Compute velocity at each interior point using centered finite differences
-    vx(2:nx-1, 2:ny-1) =  (S(2:nx-1, 3:ny) - S(2:nx-1, 1:ny-2)) / (2 * hy)
-    vy(2:nx-1, 2:ny-1) = -(S(3:nx, 2:ny-1) - S(1:nx-2, 2:ny-1)) / (2 * hx)
+    do concurrent (i=2:nx-1, j=2:ny-1)
+      vx(i, j) =  (S(i, j+1) - S(i, j-1)) / (2 * hy)
+      vy(i, j) = -(S(i+1, j) - S(i-1, j)) / (2 * hx)
+    end do
 
   end subroutine compute_velocity
 

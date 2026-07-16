@@ -16,20 +16,14 @@ contains
     logical, intent(in) :: apply_BCs
     ! local variables
     real                :: r_rms, f_rms, tolf
-    integer             :: nx, ny, iter, i, j
+    integer             :: nx, ny, iter
 
     ! set nx, ny
     nx = size(u, 1)
     ny = size(u, 2)
 
     ! compute f_rms
-    f_rms = 0.0
-    do j = 1, ny
-      do i = 1, nx
-        f_rms = f_rms + f(i, j)**2
-      end do
-    end do
-    f_rms = sqrt(f_rms / (nx * ny))
+    f_rms = sqrt(sum(f**2) / (nx*ny))
 
     tolf = tol * f_rms
 
@@ -56,7 +50,7 @@ contains
 
   ! performs one Gauss-Seidel iteration on field u
   ! returns rms residual
-  function iteration_2DPoisson(u, f, h, c, alpha) result(r_rms)
+  function iteration_2DPoisson(u, f, h, c, alpha, res) result(r_rms)
     implicit none
     ! arguments
     real, intent(inout) :: u(:, :)
@@ -64,35 +58,28 @@ contains
     real, intent(in)    :: h
     real, intent(in)    :: c
     real, intent(in)    :: alpha
+    real, intent(inout) :: res(:, :) ! local but preallocated
     ! local variables
-    real                :: r, r_rms
+    real                :: r_rms
     integer             :: nx, ny, i, j
 
     nx = size(u, 1)
     ny = size(u, 2)
 
-    ! Gauss-Seidel iteration
-    r_rms = 0.0
-    do j = 2, ny - 1
-      do i = 2, nx - 1
-
-        ! compute residual
-        r = ( u(i+1, j) &
-            + u(i-1, j) &
-            + u(i, j+1) &
-            + u(i, j-1) &
-            - (4.0 + c * h**2) * u(i, j) ) / h**2 - f(i, j)
-
-        ! update u
-        u(i, j) = u(i, j) + alpha * (h**2 / (4.0 + c * h**2)) * r
-
-        ! update r_rms
-        r_rms = r_rms + r**2
-
-      end do
+    ! Jacobi iteration
+    do concurrent (i=1:nx, j=1:ny)
+      res(i, j) = 0.0
     end do
 
-    r_rms = sqrt(r_rms / (nx * ny))
+    ! compute residual
+    call residual_2DPoisson(u, f, h, c, res)
+
+    ! update u
+    do concurrent (i=2:nx-1, j=2:ny-1)
+        u(i, j) = u(i, j) + alpha * (h**2 / (4.0 + c * h**2)) * res(i, j)
+    end do
+
+    r_rms = sqrt(sum(res**2) / (nx * ny))
 
   end function iteration_2DPoisson
 
@@ -106,17 +93,15 @@ contains
     real, intent(in)  :: c
     real, intent(out) :: res(:, :)
     ! local variables
+    integer           :: i, j
     integer           :: nx, ny
 
     nx = size(u, 1)
     ny = size(u, 2)
 
-    res(2:nx-1, 2:ny-1) = ( u(3:nx,   2:ny-1) &
-                          + u(1:nx-2, 2:ny-1) &
-                          + u(2:nx-1, 3:ny  ) &
-                          + u(2:nx-1, 1:ny-2) &
-                          - (4.0 + c * h**2) * u(2:nx-1, 2:ny-1) ) / h**2 &
-                          - f(2:nx-1, 2:ny-1)
+    do concurrent (i=2:nx-1, j=2:ny-1)
+      res(i, j) = ( u(i+1, j) + u(i-1, j) + u(i, j+1) + u(i, j-1) - (4.0 + c * h**2) * u(i, j) ) / h**2 - f(i, j)
+    end do
 
   end subroutine
 
@@ -128,7 +113,7 @@ contains
     real, intent(out) :: coarse(:, :)
     logical, intent(in) :: apply_BCs
     ! local variables
-    integer           :: nx, ny
+    integer           :: nx, ny, nxc, nyc
     integer           :: i, j, ic, jc
     real, parameter   :: a4  = 1.0 / 4.0
     real, parameter   :: a8  = 1.0 / 8.0
@@ -137,14 +122,19 @@ contains
     nx = size(fine, 1)
     ny = size(fine, 2)
 
+    nxc = size(coarse, 1)
+    nyc = size(coarse, 2)
+
     ! initalize coarse to zero (+ Dirichlet(0) BCs)
-    coarse = 0.0
+    do concurrent (i=1:nxc, j=1:nyc)
+      coarse(i, j) = 0.0
+    end do
 
     ! apply restriction stencil
-    jc = 2
-    do j = 3, ny-2, 2
-      ic = 2
-      do i = 3, nx-2, 2
+    do concurrent (i=3:nx-2, j=3:ny-2)
+      if ((mod(i, 2) == 1) .and. (mod(j, 2) == 1)) then
+        ic  = (i-1)/2+1
+        jc  = (j-1)/2+1
         coarse(ic, jc) = fine(i, j)
         ! coarse(ic, jc) = a4 * fine(i, j) &
         !                + a8 * fine(i+1, j) &
@@ -155,9 +145,7 @@ contains
         !                + a16 * fine(i+1, j-1) &
         !                + a16 * fine(i-1, j+1) &
         !                + a16 * fine(i-1, j-1)
-        ic = ic + 1
-      end do
-      jc = jc + 1
+      end if
     end do
 
     ! apply Neumann BCs for temperature T
@@ -185,12 +173,15 @@ contains
     ny = size(fine, 2)
 
     ! initialize fine to zero (+ Dirichlet(0) BCs)
-    fine = 0.0
+    do concurrent (i=1:nx, j=1:ny)
+      fine(i, j) = 0.0
+    end do
 
-    jc = 2
-    do j = 3, ny-2, 2
-      ic = 2
-      do i = 3, nx-2, 2
+    ! Needs atomics !!!
+    do concurrent (i=3:nx-2, j=3:ny-2)
+      if ((mod(i, 2) == 1) .and. (mod(j, 2) == 1)) then
+        ic  = (i-1)/2+1
+        jc  = (j-1)/2+1
         fine(i, j) = coarse(ic, jc)
         fine(i+1, j) = fine(i+1, j) + a2 * coarse(ic, jc)
         fine(i-1, j) = fine(i-1, j) + a2 * coarse(ic, jc)
@@ -200,9 +191,7 @@ contains
         fine(i+1, j-1) = fine(i+1, j-1) + a4 * coarse(ic, jc)
         fine(i-1, j+1) = fine(i-1, j+1) + a4 * coarse(ic, jc)
         fine(i-1, j-1) = fine(i-1, j-1) + a4 * coarse(ic, jc)
-        ic = ic + 1
-      end do
-      jc = jc + 1
+      end if
     end do
 
     ! apply Neumann BCs for temperature T
@@ -221,9 +210,9 @@ contains
     real, intent(in)    :: rhs(:, :), h, c
     logical, intent(in) :: apply_BCs
     ! local variables
-    integer             :: nx, ny, nxc, nyc, i
-    real, allocatable   :: res_c(:, :), corr_c(:, :), res_f(:, :), corr_f(:, :)
-    real                :: alpha=1.0, res_rms
+    integer             :: nx, ny, nxc, nyc, i, j
+    real, allocatable   :: res_c(:, :), corr_c(:, :), res_f(:, :), corr_f(:, :), res_f_tmp(:, :)
+    real                :: alpha=4.0/5.0, res_rms
 
     nx = size(u_f, 1); ny = size(u_f, 2)  ! must be power of 2 plus 1
 
@@ -233,32 +222,39 @@ contains
 
     nxc = 1+(nx-1)/2; nyc = 1+(ny-1)/2  ! coarse grid size
 
+    allocate(res_f_tmp(nx, ny))
+
     if (min(nx, ny) > 5) then  ! not the coarsest level
 
       allocate(res_f(nx, ny), corr_f(nx, ny), &
         corr_c(nxc, nyc), res_c(nxc, nyc))
 
       !---------- take 2 iterations on the fine grid--------------
-      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha)
-      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha)
+      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f_tmp)
+      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f_tmp)
 
       !--------- restrict the residual to the coarse grid --------
       call residual_2DPoisson(u_f, rhs, h, c, res_f)
       call restrict(res_f, res_c, apply_BCs)
 
       !---------- solve for the coarse grid correction -----------
-      corr_c = 0.
+      do concurrent (i=1:nxc, j=1:nyc)
+        corr_c(i, j) = 0.
+      end do
+
       res_rms = Vcycle_2DPoisson(corr_c, res_c, h*2, c, apply_BCs) ! *RECURSIVE CALL*
 
       !---- prolongate (interpolate) the correction to the fine grid
       call prolongate(corr_c, corr_f, apply_BCs)
 
       !---------- correct the fine-grid solution -----------------
-      u_f = u_f - corr_f
+      do concurrent (i=1:nx, j=1:ny)
+        u_f(i, j) = u_f(i, j) - corr_f(i, j)
+      end do
 
       !---------- two more smoothing iterations on the fine grid---
-      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha)
-      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha)
+      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f_tmp)
+      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f_tmp)
 
       deallocate(res_f, corr_f, res_c, corr_c)
 
@@ -267,12 +263,14 @@ contains
       !----- coarsest level (ny=5): iterate to get 'exact' solution
 
       do i = 1, 100
-        res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha)
+        res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f_tmp)
       end do
 
     end if
 
     resV = res_rms   ! returns the rms. residual
+
+    deallocate(res_f_tmp)
 
   end function Vcycle_2DPoisson
 

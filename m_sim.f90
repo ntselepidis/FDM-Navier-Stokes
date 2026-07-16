@@ -98,7 +98,7 @@ contains
     implicit none
     ! local variables
     real :: width
-    integer :: i
+    integer :: i, j
 
     h = 1.0 / ( ny - 1.0 ) ! mesh size
     width = ( nx - 1.0 ) / ( ny - 1.0 ) ! width
@@ -112,15 +112,27 @@ contains
     allocate(W(nx, ny), dW2(nx, ny), dWx(nx, ny), dWy(nx, ny), W_rhs(nx, ny))
     allocate(Ra_dTdx(nx, ny))
 
-    S = 0.0; vx = 0.0; vy = 0.0; v = 0.0
-    T = 0.0; dT2 = 0.0; dTx = 0.0; dTy = 0.0; T_rhs = 0.0
-    W = 0.0; dW2 = 0.0; dWx = 0.0; dWy = 0.0; W_rhs = 0.0
-    Ra_dTdx = 0.0
+    do concurrent (i=1:nx, j=1:ny)
+      S(i, j) = 0.0
+      vx(i, j) = 0.0
+      vy(i, j) = 0.0
+      v(i, j) = 0.0
+      T(i, j) = 0.0
+      dT2(i, j) = 0.0
+      dTx(i, j) = 0.0
+      dTy(i, j) = 0.0
+      T_rhs(i, j) = 0.0
+      dW2(i, j) = 0.0
+      dWx(i, j) = 0.0
+      dWy(i, j) = 0.0
+      W_rhs(i, j) = 0.0
+      Ra_dTdx(i, j) = 0.0
+    end do
 
     ! initialize temperature T
     if (Tinit == 'cosine') then
-      do concurrent (i=1:nx)
-        T(i, :) = 0.5 * ( 1.0 + cos((3.0*pi*(i-1)*h)/width) )
+      do concurrent (i=1:nx, j=1:ny)
+        T(i, j) = 0.5 * ( 1.0 + cos((3.0*pi*(i-1)*h)/width) )
       end do
     else
       call random_number(T)
@@ -141,6 +153,7 @@ contains
     real, intent(in) :: time
     ! local variables
     real :: r_rms, v_max, c
+    integer :: i, j
 
     ! solve for stream function S: D S = W (Dirichlet BCs = 0)
     r_rms = MGsolve_2DPoisson(S, W, h, 0.0, err, niters, .false.)
@@ -160,7 +173,9 @@ contains
     call apply_boundary_conditions(T)
 
     ! compute Ra * dT / dx
-    Ra_dTdx(2:nx-1, 2:ny-1) = Ra * ( ( T(3:nx, 2:ny-1) - T(1:nx-2, 2:ny-1) ) / (2 * h) )
+    do concurrent (i=2:nx-1, j=2:ny-1)
+      Ra_dTdx(i, j) = Ra * ( ( T(i+1, j) - T(i-1, j) ) / (2 * h) )
+    end do
 
     ! diffusion terms for temperature T and vorticity W
     if (beta /= 1.0) then
@@ -178,16 +193,22 @@ contains
     if (beta > 0.0) then
       ! semi-implicit step for temperature T
       c = 1.0 / (beta * this%dt)
-      T_rhs = -c * ( T + this%dt * ( (1.0 - beta) * dT2 - dTx - dTy ) )
+      do concurrent (i=1:nx, j=1:ny)
+        T_rhs(i, j) = -c * ( T(i,j) + this%dt * ( (1.0 - beta) * dT2(i, j) - dTx(i, j) - dTy(i, j) ) )
+      end do
       r_rms = MGsolve_2DPoisson(T, T_rhs, h, c, err, niters, .true.)
       ! semi-implicit step for vorticity W
       c = c / Pr
-      W_rhs = -c * ( W + this%dt * ( (1.0 - beta) * dW2 - dWx - dWy - Pr * Ra_dTdx ) )
+      do concurrent (i=1:nx, j=1:ny)
+        W_rhs(i, j) = -c * ( W(i, j) + this%dt * ( (1.0 - beta) * dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) ) )
+      end do
       r_rms = MGsolve_2DPoisson(W, W_rhs, h, c, err, niters, .false.)
     else
       ! explicit step for temperature T and vorticity W
-      T = T + this%dt * ( dT2 - dTx - dTy )
-      W = W + this%dt * ( dW2 - dWx - dWy - Pr * Ra_dTdx )
+      do concurrent (i=1:nx, j=1:ny)
+        T(i, j) = T(i, j) + this%dt * ( dT2(i, j) - dTx(i, j) - dTy(i, j) )
+        W(i, j) = W(i, j) + this%dt * ( dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) )
+      end do
     end if
 
   end subroutine evolve
@@ -202,7 +223,7 @@ contains
       dt_ = dt_dif
     else
       ! compute advective timestep
-      dt_adv = a_adv * min(h / maxval(vx), h / maxval(vy))
+      dt_adv = a_adv * min(h / maxval(abs(vx)), h / maxval(abs(vy)))
       ! compute timestep
       if (beta >= 0.5) then
         dt_ = dt_adv ! allow big diffusive timesteps

@@ -10,16 +10,15 @@ contains
     ! result
     real, dimension(size(T, 1), size(T, 2)) :: diffusion2d
     ! local variables
+    integer :: i, j
     integer :: nx, ny
     nx = size(T, 1)
     ny = size(T, 2)
 
     ! apply 2D diffusion
-    diffusion2d(2:nx-1, 2:ny-1) = k * ( T(3:nx,   2:ny-1) &
-                                      + T(1:nx-2, 2:ny-1) &
-                                      + T(2:nx-1, 3:ny  ) &
-                                      + T(2:nx-1, 1:ny-2) &
-                                      - 4.0 * T(2:nx-1, 2:ny-1) ) / h**2
+    do concurrent (i=2:nx-1, j=2:ny-1)
+      diffusion2d(i, j) = k * ( T(i+1, j) + T(i-1, j) + T(i, j+1) + T(i, j-1) - 4.0 * T(i, j) ) / h**2
+    end do
 
   end function diffusion2d
 
