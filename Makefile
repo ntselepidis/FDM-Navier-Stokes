@@ -11,10 +11,10 @@ ifneq (,$(findstring nvfortran,$(FC)))
   LDFLAGS = -cudaforlibs -cudalib=curand,nvtx3
 else
   ifeq ($(DEBUG),1)
-    FFLAGS = -O0 -g -fdefault-real-8 -fdefault-integer-4 -fbacktrace \
+    FFLAGS = -O0 -g -fdefault-real-8 -fbacktrace \
              -fcheck=all -finit-real=snan -ffpe-trap=invalid,zero,overflow -Wall -cpp
   else
-    FFLAGS = -O3 -fdefault-real-8 -fdefault-integer-4 -Wall -cpp
+    FFLAGS = -O3 -fdefault-real-8 -Wall -cpp
   endif
   LDFLAGS =
 endif
