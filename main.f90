@@ -1,5 +1,6 @@
 program navier_stokes_simulation
   use m_sim
+  use m_nvtx, only: nvtx_push, nvtx_pop
   implicit none
   type(simulation) :: sim
   real             :: time
@@ -12,7 +13,9 @@ program navier_stokes_simulation
   time = 0.0; step = 0
   do while ( time  < sim%total_time )
     ! evolve simulation
+    call nvtx_push('timestep')
     call sim%evolve(time)
+    call nvtx_pop()
     ! advance timestep
     time = time + sim%dt
     ! increment number of timesteps

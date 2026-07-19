@@ -1,4 +1,5 @@
 module m_bc
+  use m_nvtx, only: nvtx_push, nvtx_pop
   ! no variables in this module
 contains
 
@@ -6,8 +7,10 @@ contains
     implicit none
     real, intent(inout) :: T(:, :)
 
+    call nvtx_push('apply_boundary_conditions')
     call apply_dirichlet_boundary_conditions(T)
     call apply_neumann_boundary_conditions(T)
+    call nvtx_pop()
 
   end subroutine apply_boundary_conditions
 

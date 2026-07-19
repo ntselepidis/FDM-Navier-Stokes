@@ -3,6 +3,10 @@ module m_sim
   use m_fdm
   use m_mg,     only: MGsolve_2DPoisson
   use m_stream, only: compute_velocity
+  use m_nvtx,   only: nvtx_push, nvtx_pop
+#ifdef NVHPC
+  use curandex
+#endif
   implicit none
 
   private
@@ -156,15 +160,24 @@ contains
     integer :: i, j
 
     ! solve for stream function S: D S = W (Dirichlet BCs = 0)
+    call nvtx_push('MGsolve_S')
     r_rms = MGsolve_2DPoisson(S, W, h, 0.0, err, niters, .false.)
+    call nvtx_pop()
 
     ! compute velocity field (vx, vy) from stream function S
+    call nvtx_push('compute_velocity')
     call compute_velocity(S, h, h, vx, vy)
+    call nvtx_pop()
 
     ! compute velocity magnitude v
-    v = sqrt(vx**2 + vy**2)
-    v_max = maxval(v)
+    call nvtx_push('v_magnitude')
+    v_max = 0.0
+    do concurrent (i=1:nx, j=1:ny) reduce(max:v_max)
+      v(i, j) = sqrt(vx(i, j)**2 + vy(i, j)**2)
+      v_max = max(v_max, v(i, j))
+    end do
     write(v_file_id) time, v_max
+    call nvtx_pop()
 
     ! compute timestep dt
     this%dt = compute_dt(v_max)
@@ -173,42 +186,58 @@ contains
     call apply_boundary_conditions(T)
 
     ! compute Ra * dT / dx
+    call nvtx_push('Ra_dTdx')
     do concurrent (i=2:nx-1, j=2:ny-1)
       Ra_dTdx(i, j) = Ra * ( ( T(i+1, j) - T(i-1, j) ) / (2 * h) )
     end do
+    call nvtx_pop()
 
     ! diffusion terms for temperature T and vorticity W
     if (beta /= 1.0) then
-      dT2 = diffusion2d(T, h, k)
-      dW2 = diffusion2d(W, h, Pr)
+      call nvtx_push('diffusion')
+      call diffusion2d(T, h, k, dT2)
+      call diffusion2d(W, h, Pr, dW2)
+      call nvtx_pop()
     end if
 
     ! advection terms for temperature T and vorticity W
-    dTx = advection2dx(T, h, vx)
-    dTy = advection2dy(T, h, vy)
-    dWx = advection2dx(W, h, vx)
-    dWy = advection2dy(W, h, vy)
+    call nvtx_push('advection')
+    call advection2dx(T, h, vx, dTx)
+    call advection2dy(T, h, vy, dTy)
+    call advection2dx(W, h, vx, dWx)
+    call advection2dy(W, h, vy, dWy)
+    call nvtx_pop()
 
     ! Euler step for temperature T and vorticity W
     if (beta > 0.0) then
       ! semi-implicit step for temperature T
       c = 1.0 / (beta * this%dt)
+      call nvtx_push('T_rhs')
       do concurrent (i=1:nx, j=1:ny)
         T_rhs(i, j) = -c * ( T(i,j) + this%dt * ( (1.0 - beta) * dT2(i, j) - dTx(i, j) - dTy(i, j) ) )
       end do
+      call nvtx_pop()
+      call nvtx_push('MGsolve_T')
       r_rms = MGsolve_2DPoisson(T, T_rhs, h, c, err, niters, .true.)
+      call nvtx_pop()
       ! semi-implicit step for vorticity W
       c = c / Pr
+      call nvtx_push('W_rhs')
       do concurrent (i=1:nx, j=1:ny)
         W_rhs(i, j) = -c * ( W(i, j) + this%dt * ( (1.0 - beta) * dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) ) )
       end do
+      call nvtx_pop()
+      call nvtx_push('MGsolve_W')
       r_rms = MGsolve_2DPoisson(W, W_rhs, h, c, err, niters, .false.)
+      call nvtx_pop()
     else
       ! explicit step for temperature T and vorticity W
+      call nvtx_push('explicit_step')
       do concurrent (i=1:nx, j=1:ny)
         T(i, j) = T(i, j) + this%dt * ( dT2(i, j) - dTx(i, j) - dTy(i, j) )
         W(i, j) = W(i, j) + this%dt * ( dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) )
       end do
+      call nvtx_pop()
     end if
 
   end subroutine evolve
@@ -217,13 +246,22 @@ contains
     implicit none
     ! arguments
     real, intent(in)  :: v_max
+    ! local variables
+    real    :: max_absvx, max_absvy
+    integer :: i, j
 
     if (v_max == 0.0) then
       ! set timestep equal to diffusive timestep (avoid division by zero)
       dt_ = dt_dif
     else
       ! compute advective timestep
-      dt_adv = a_adv * min(h / maxval(abs(vx)), h / maxval(abs(vy)))
+      max_absvx = 0.0
+      max_absvy = 0.0
+      do concurrent (i=1:nx, j=1:ny) reduce(max:max_absvx) reduce(max:max_absvy)
+        max_absvx = max(max_absvx, abs(vx(i, j)))
+        max_absvy = max(max_absvy, abs(vy(i, j)))
+      end do
+      dt_adv = a_adv * min(h / max_absvx, h / max_absvy)
       ! compute timestep
       if (beta >= 0.5) then
         dt_ = dt_adv ! allow big diffusive timesteps

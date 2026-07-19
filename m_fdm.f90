@@ -2,13 +2,13 @@ module m_fdm
   ! no variables in this module
 contains
 
-  function diffusion2d(T, h, k)
+  subroutine diffusion2d(T, h, k, dT2)
     implicit none
     ! arguments
     real, intent(in) :: h, k
     real, intent(in) :: T(:, :)
     ! result
-    real, dimension(size(T, 1), size(T, 2)) :: diffusion2d
+    real, intent(out) :: dT2(:, :)
     ! local variables
     integer :: i, j
     integer :: nx, ny
@@ -17,19 +17,19 @@ contains
 
     ! apply 2D diffusion
     do concurrent (i=2:nx-1, j=2:ny-1)
-      diffusion2d(i, j) = k * ( T(i+1, j) + T(i-1, j) + T(i, j+1) + T(i, j-1) - 4.0 * T(i, j) ) / h**2
+      dT2(i, j) = k * ( T(i+1, j) + T(i-1, j) + T(i, j+1) + T(i, j-1) - 4.0 * T(i, j) ) / h**2
     end do
 
-  end function diffusion2d
+  end subroutine diffusion2d
 
-  function advection2dx(T, hx, vx)
+  subroutine advection2dx(T, hx, vx, dTx)
     implicit none
     ! arguments
     real, intent(in) :: hx
     real, intent(in) :: T(:, :)
     real, intent(in) :: vx(:, :)
     ! result
-    real, dimension(size(T, 1), size(T, 2)) :: advection2dx
+    real, intent(out) :: dTx(:, :)
     ! local variables
     integer :: i, j
     integer :: nx, ny
@@ -38,22 +38,22 @@ contains
 
     do concurrent (i=2:nx-1, j=2:ny-1)
       if (vx(i, j) > 0) then
-        advection2dx(i, j) = vx(i, j) * (T(i, j) - T(i-1, j)) / hx
+        dTx(i, j) = vx(i, j) * (T(i, j) - T(i-1, j)) / hx
       else
-        advection2dx(i, j) = vx(i, j) * (T(i+1, j) - T(i, j)) / hx
+        dTx(i, j) = vx(i, j) * (T(i+1, j) - T(i, j)) / hx
       end if
     end do
 
-  end function advection2dx
+  end subroutine advection2dx
 
-  function advection2dy(T, hy, vy)
+  subroutine advection2dy(T, hy, vy, dTy)
     implicit none
     ! arguments
     real, intent(in) :: hy
     real, intent(in) :: T(:, :)
     real, intent(in) :: vy(:, :)
     ! result
-    real, dimension(size(T, 1), size(T, 2)) :: advection2dy
+    real, intent(out) :: dTy(:, :)
     ! local variables
     integer :: i, j
     integer :: nx, ny
@@ -62,12 +62,12 @@ contains
 
     do concurrent (i=2:nx-1, j=2:ny-1)
       if (vy(i, j) > 0) then
-        advection2dy(i, j) = vy(i, j) * (T(i, j) - T(i, j-1)) / hy
+        dTy(i, j) = vy(i, j) * (T(i, j) - T(i, j-1)) / hy
       else
-        advection2dy(i, j) = vy(i, j) * (T(i, j+1) - T(i, j)) / hy
+        dTy(i, j) = vy(i, j) * (T(i, j+1) - T(i, j)) / hy
       end if
     end do
 
-  end function advection2dy
+  end subroutine advection2dy
 
 end module m_fdm
