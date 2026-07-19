@@ -172,7 +172,7 @@ contains
     ! compute velocity magnitude v
     call nvtx_push('v_magnitude')
     v_max = 0.0
-    do concurrent (i=1:nx, j=1:ny) reduce(max:v_max)
+    do concurrent (i=2:nx-1, j=2:ny-1) reduce(max:v_max)
       v(i, j) = sqrt(vx(i, j)**2 + vy(i, j)**2)
       v_max = max(v_max, v(i, j))
     end do
@@ -257,7 +257,7 @@ contains
       ! compute advective timestep
       max_absvx = 0.0
       max_absvy = 0.0
-      do concurrent (i=1:nx, j=1:ny) reduce(max:max_absvx) reduce(max:max_absvy)
+      do concurrent (i=2:nx-1, j=2:ny-1) reduce(max:max_absvx) reduce(max:max_absvy)
         max_absvx = max(max_absvx, abs(vx(i, j)))
         max_absvy = max(max_absvy, abs(vy(i, j)))
       end do

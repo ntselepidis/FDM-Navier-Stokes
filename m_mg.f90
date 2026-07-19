@@ -292,7 +292,7 @@ contains
 
       !---------- two more smoothing iterations on the fine grid---
       res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, .false.)
-      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, .true.)
+      res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, level==0)
 
       deallocate(res_f, corr_f, res_c, corr_c)
 
@@ -312,11 +312,12 @@ contains
         end do
       end do
 
-      res_rms = 0.0
-      do concurrent (i=2:nx-1, j=2:ny-1) reduce(+:res_rms)
-        res_rms = res_rms + res_f(i,j)**2
-      end do
-      res_rms = sqrt(res_rms / (nx*ny))
+      res_rms = -1.0
+      !res_rms = 0.0
+      !do concurrent (i=2:nx-1, j=2:ny-1) reduce(+:res_rms)
+      !  res_rms = res_rms + res_f(i,j)**2
+      !end do
+      !res_rms = sqrt(res_rms / (nx*ny))
 
       deallocate(res_f)
 

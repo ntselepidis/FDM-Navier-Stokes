@@ -36,12 +36,6 @@ contains
     nx = size(S, 1)
     ny = size(S, 2)
 
-    ! Initialize vx and vy
-    do concurrent (i=1:nx, j=1:ny)
-      vx(i, j) = 0.0
-      vy(i, j) = 0.0
-    end do
-
     ! Compute velocity at each interior point using centered finite differences
     do concurrent (i=2:nx-1, j=2:ny-1)
       vx(i, j) =  (S(i, j+1) - S(i, j-1)) / (2 * hy)
