@@ -25,7 +25,7 @@ contains
 
     ! compute f_rms
     f_rms = 0.0
-    do concurrent (i=1:nx, j=1:ny) reduce(+:f_rms)
+    do concurrent (i=2:nx-1, j=2:ny-1) reduce(+:f_rms)
       f_rms = f_rms + f(i,j)**2
     end do
     f_rms = sqrt(f_rms / (nx*ny))

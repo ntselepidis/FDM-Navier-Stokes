@@ -213,7 +213,7 @@ contains
       ! semi-implicit step for temperature T
       c = 1.0 / (beta * this%dt)
       call nvtx_push('T_rhs')
-      do concurrent (i=1:nx, j=1:ny)
+      do concurrent (i=2:nx-1, j=2:ny-1)
         T_rhs(i, j) = -c * ( T(i,j) + this%dt * ( (1.0 - beta) * dT2(i, j) - dTx(i, j) - dTy(i, j) ) )
       end do
       call nvtx_pop()
@@ -223,7 +223,7 @@ contains
       ! semi-implicit step for vorticity W
       c = c / Pr
       call nvtx_push('W_rhs')
-      do concurrent (i=1:nx, j=1:ny)
+      do concurrent (i=2:nx-1, j=2:ny-1)
         W_rhs(i, j) = -c * ( W(i, j) + this%dt * ( (1.0 - beta) * dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) ) )
       end do
       call nvtx_pop()
@@ -233,7 +233,7 @@ contains
     else
       ! explicit step for temperature T and vorticity W
       call nvtx_push('explicit_step')
-      do concurrent (i=1:nx, j=1:ny)
+      do concurrent (i=2:nx-1, j=2:ny-1)
         T(i, j) = T(i, j) + this%dt * ( dT2(i, j) - dTx(i, j) - dTy(i, j) )
         W(i, j) = W(i, j) + this%dt * ( dW2(i, j) - dWx(i, j) - dWy(i, j) - Pr * Ra_dTdx(i, j) )
       end do
