@@ -266,6 +266,7 @@ contains
 
       allocate(res_f(nx, ny), corr_f(nx, ny), &
         corr_c(nxc, nyc), res_c(nxc, nyc))
+      !$acc data create(capture:res_f, corr_f, corr_c, res_c)
 
       !---------- take 2 iterations on the fine grid--------------
       res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, .false.)
@@ -294,23 +295,33 @@ contains
       res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, .false.)
       res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f, level==0)
 
+      !$acc end data
       deallocate(res_f, corr_f, res_c, corr_c)
 
     else
 
       !----- coarsest level (ny=5): iterate to get 'exact' solution
       allocate(res_f(nx, ny))
+      !$acc data create(capture:res_f)
 
       !do i = 1, 100
       !  res_rms = iteration_2DPoisson(u_f, rhs, h, c, alpha, res_f)
       !end do
 
-      do concurrent (i=2:nx-1, j=2:ny-1)
-        do iter = 1, 100
-          res_f(i, j) = ( u_f(i+1, j) + u_f(i-1, j) + u_f(i, j+1) + u_f(i, j-1) - (4.0 + c * h**2) * u_f(i, j) ) / h**2 - rhs(i, j)
-          u_f(i, j) = u_f(i, j) + alpha * (h**2 / (4.0 + c * h**2)) * res_f(i, j)
+      !$acc parallel
+      !$acc loop seq
+      do iter = 1, 100
+        !$acc loop gang vector collapse(2)
+        do j = 2, ny-1
+          do i = 2, nx-1
+            res_f(i, j) = ( u_f(i+1, j) + u_f(i-1, j) + u_f(i, j+1) + u_f(i, j-1) - (4.0 + c * h**2) * u_f(i, j) ) / h**2 - rhs(i, j)
+            u_f(i, j) = u_f(i, j) + alpha * (h**2 / (4.0 + c * h**2)) * res_f(i, j)
+          end do
         end do
+        !$acc end loop
       end do
+      !$acc end loop
+      !$acc end parallel
 
       res_rms = -1.0
       !res_rms = 0.0
@@ -319,6 +330,7 @@ contains
       !end do
       !res_rms = sqrt(res_rms / (nx*ny))
 
+      !$acc end data
       deallocate(res_f)
 
     end if
