@@ -5,7 +5,7 @@ ifneq (,$(findstring nvfortran,$(FC)))
   ifeq ($(DEBUG),1)
     FFLAGS = -i4 -r8 -O0 -g -cpp -DNVHPC
   else
-    FFLAGS = -i4 -r8 -O3 -acc=gpu -stdpar=gpu -gpu=cc100,mem:unified -cuda \
+    FFLAGS = -i4 -r8 -O3 -acc=gpu -stdpar=gpu -gpu=ccnative,mem:unified -cuda \
              -Minline=reshape -Minfo=accel,inline -cpp -DNVHPC
   endif
   LDFLAGS = -cudaforlibs -cudalib=curand,nvtx3
